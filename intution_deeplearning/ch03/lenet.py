@@ -104,38 +104,15 @@ dataset = MNISTDataset()
 model = lenet(dataset.image_shape, data.num_classes)
 
 #train the model
+x_train, y_train, x_test, y_test = dataset.get_batch()
 
+trainer = Trainer(model, loss="categorical_crossentropy", optimizer=Adam())
 
+trainer.train(x_train, y_train, batch_size=128, epochs=12, validation_split=0.2)
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+#show result
+score = model.evaluate(x_test, y_test, verbose=0)
+print("Test loss:", score[0])
+print("Test accuracy:", score[1])
 
 
