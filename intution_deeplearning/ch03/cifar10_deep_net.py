@@ -17,13 +17,18 @@ from keras.callbacks import TensorBoard, ModelCheckpoint
 def network(input_shape, num_classes):
     model = Sequential()
 #extract image features by convolution and max pooling layers
-    model.add(Conv2D(32, kernel_size=5, padding="same",
+    model.add(Conv2D(32, kernel_size=3, padding="same",
         input_shape=input_shape, activation="relu"))
+# add
+    model.add(Conv2D(32, kernel_size=3, activation="relu"))
+    
     model.add(MaxPooling2D(pool_size=(2, 2))) #処理後の特徴マップは14x14x20
     model.add(Dropout(0.25))
     model.add(Conv2D(64, kernel_size=3, padding="same",
         activation="relu"))
+    model.add(Conv2D(64, kernel_size=3, activation="relu"))
     model.add(MaxPooling2D(pool_size=(2, 2))) #処理後の特徴マップは7x7x20
+    model.add(Dropout(0.25))
 # classify the class by fully-connected layers
     model.add(Flatten())
     model.add(Dense(512, activation="relu"))
@@ -110,8 +115,8 @@ dataset = CIFAR10Dataset()
 
 
 # make model
-# model = lenet(dataset.image_shape, data.num_classes)
-model = network(dataset.image_shape, data.num_classes)
+# model = lenet(dataset.image_shape, dataset.num_classes)
+model = network(dataset.image_shape, dataset.num_classes)
 
 #train the model
 x_train, y_train, x_test, y_test = dataset.get_batch()
@@ -125,6 +130,7 @@ trainer.train(x_train, y_train, batch_size=128, epochs=12, validation_split=0.2)
 score = model.evaluate(x_test, y_test, verbose=0)
 print("Test loss:", score[0])
 print("Test accuracy:", score[1])
+
 
 
 
