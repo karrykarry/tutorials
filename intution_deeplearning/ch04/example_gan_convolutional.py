@@ -9,6 +9,8 @@ from keras.models import Model
 from keras.optimizers import Adam
 from keras.callbacks import TensorBoard
 from keras.datasets import mnist
+
+#GANのためのモジュールを、keras_adversarialからインポートしてくる。また、画像の描画に必要な設定を行います。
 from keras_adversarial.image_grid_callback import ImageGridCallback
 from keras_adversarial import AdversarialModel, simple_gan, gan_targets
 from keras_adversarial import AdversarialOptimizerSimultaneous, normal_latent_sampling
@@ -18,17 +20,19 @@ from image_utils import dim_ordering_fix, dim_ordering_input, dim_ordering_resha
 # This line allows mpl to run with no DISPLAY defined
 mpl.use("Agg")
 
-
+#以前提示したものと同様の方法で生成モデルを定義していく。
+#
 def model_generator():
     nch = 256
     g_input = Input(shape=[100])
-    H = Dense(nch * 14 * 14)(g_input)
-    H = BatchNormalization()(H)
-    H = Activation("relu")(H)
-    H = dim_ordering_reshape(nch, 14)(H)
-    H = UpSampling2D(size=(2, 2))(H)
+    H = Dense(nch * 14 * 14)(g_input)       #全結合層
+    H = BatchNormalization()(H)             #正規化
+    H = Activation("relu")(H)               #活性化関数
+    H = dim_ordering_reshape(nch, 14)(H)    #幅x高さx深さ
+    H = UpSampling2D(size=(2, 2))(H)        #
+    #以降畳み込み
     H = Conv2D(int(nch / 2), (3, 3), padding="same")(H)
-    H = BatchNormalization()(H)
+    H = BatchNormalization()(H)                         #正規化
     H = Activation("relu")(H)
     H = Conv2D(int(nch / 4), (3, 3), padding="same")(H)
     H = BatchNormalization()(H)
@@ -37,7 +41,7 @@ def model_generator():
     g_V = Activation("sigmoid")(H)
     return Model(g_input, g_V)
 
-
+# LeakyReLUの採用
 def model_discriminator(input_shape=(1, 28, 28), dropout_rate=0.5):
     d_input = dim_ordering_input(input_shape, name="input_x")
     nch = 512
@@ -63,7 +67,7 @@ def model_discriminator(input_shape=(1, 28, 28), dropout_rate=0.5):
     d_V = Dense(1, activation="sigmoid")(H)
     return Model(d_input, d_V)
 
-
+#MNISTのデータを読み込んで正規化するための2つの簡単な関数
 def mnist_process(x):
     x = x.astype(np.float32) / 255.0
     return x
@@ -83,6 +87,7 @@ def generator_sampler(latent_dim, generator):
     return fun
 
 
+
 if __name__ == "__main__":
     # z \in R^100
     latent_dim = 100
@@ -94,6 +99,7 @@ if __name__ == "__main__":
     # discriminator (x -> y)
     discriminator = model_discriminator(input_shape=input_shape)
     # gan (x - > yfake, yreal), z generated on GPU
+    # 正規分布からサンプリングされます
     gan = simple_gan(generator, discriminator,
                      normal_latent_sampling((latent_dim,)))
 
@@ -102,7 +108,12 @@ if __name__ == "__main__":
     discriminator.summary()
     gan.summary()
 
+
+    
     # build adversarial model
+    # 学習を行うためにAdversarialModelの作成とコンパイルを行います。
+    # 最適化:Adam, 損失関数:binary_crossentropy
+    
     model = AdversarialModel(base_model=gan,
                              player_params=[generator.trainable_weights, 
                                             discriminator.trainable_weights],
@@ -113,6 +124,11 @@ if __name__ == "__main__":
                               loss="binary_crossentropy")
 
     # train model
+    # 生成モデルの作成した画像がエポックごとに確認できるように、画像を生成させるコール爆である
+    # generator_cb を作成します。
+    # これにより、偽造された画像が少しづつ本物に近づいてくる様子を確認できる
+    # また、学習状況を確認するためのTensorBoardのコールバックを作成します。
+
     generator_cb = ImageGridCallback("output/gan_convolutional/epoch-{:03d}.png",
                                      generator_sampler(latent_dim, generator))
     callbacks = [generator_cb]
@@ -123,15 +139,15 @@ if __name__ == "__main__":
 
     xtrain, xtest = mnist_data()
     xtrain = dim_ordering_fix(xtrain.reshape((-1, 1, 28, 28)))
-    xtest = dim_ordering_fix(xtest.reshape((-1, 1, 28, 28)))
+    xtest = dim_ordering_fix(xtest.reshape((-1, 1, 28, 28)))    #image_utils.pyで定義された、異なる画像の次元の順序をサポートするためのユーティリティ関数です。
     y = gan_targets(xtrain.shape[0])
     ytest = gan_targets(xtest.shape[0])
     history = model.fit(x=xtrain, y=y, validation_data=(xtest, ytest), 
                         callbacks=[generator_cb], epochs=100,
                         batch_size=32)
     df = pd.DataFrame(history.history)
-    df.to_csv("output/gan_convolutional/history.csv")
+    df.to_csv("output/history.csv")
 
-    generator.save("output/gan_convolutional/generator.h5")
-    discriminator.save("output/gan_convolutional/discriminator.h5")
+    generator.save("output/generator.h5")
+    discriminator.save("output/discriminator.h5")
 
